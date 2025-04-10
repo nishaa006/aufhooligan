@@ -1,15 +1,38 @@
-import logging
 import json
-from utils import load_operations_data
+import logging
+import pandas as pd
+
+from src.utils import parse_datetime, fetch_data_from_api, analyze_data
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def home_page(datetime_input):
-    """Функция страницы «Главная»"""
+
+def main_page(date_str: str):
+    """Функция для страницы 'Главная', принимает строку с датой и временем и возвращает JSON-ответ."""
     try:
-        json_response = load_operations_data(datetime_input)
-        return json.loads(json_response)
+        # Парсим строку с датой
+        date = parse_datetime(date_str)
+
+        # Получаем данные с API
+        raw_data = fetch_data_from_api(date)
+
+        # Анализируем данные
+        analysis_result = analyze_data(raw_data)
+
+        # Формируем JSON-ответ
+        json_response = json.dumps(analysis_result)
+        logger.info("Результат успешно сформирован и возвращен")
+        return json_response
+
     except Exception as e:
-        logger.error(f"Ошибка на главной странице: {e}")
-        return {"error": "Ошибка обработки запроса"}
+        logger.error(f"Ошибка на странице 'Главная': {e}")
+        error_response = json.dumps({"error": "Внутренняя ошибка сервера"})
+        return error_response
+
+
+# Пример вызова функции
+if __name__ == "__main__":
+    date_input = "2025-04-10 15:30:00"  # Пример даты и времени
+    response = main_page(date_input)
+    print(response)

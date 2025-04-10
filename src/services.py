@@ -1,7 +1,7 @@
 import json
 import logging
-import pandas as pd
 
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -29,17 +29,21 @@ def simple_search(query, file_path):
 
         query = query.lower()
 
+        # Загружаем данные из Excel
         df = load_operations_data(file_path)
 
-        results = df[df.apply(lambda row: row.astype(str).str.contains(query, case=False).any(), axis=1)]
+        # Выводим первые несколько строк для отладки
+        logger.info(f"Первые несколько строк данных: {df.head()}")
+
+        # Преобразуем все строки в DataFrame к строковому типу и ищем совпадения
+        results = df[df.apply(lambda row: row.astype(str).str.contains(query, case=False, na=False).any(), axis=1)]
 
         logger.info(f"Найдено {len(results)} транзакций по запросу: {query}")
 
-        result_json = json.dumps({
-            "query": query,
-            "results_count": len(results),
-            "results": results.to_dict(orient="records")
-        }, ensure_ascii=False)
+        result_json = json.dumps(
+            {"query": query, "results_count": len(results), "results": results.to_dict(orient="records")},
+            ensure_ascii=False,
+        )
 
         return result_json
     except Exception as e:
@@ -47,6 +51,7 @@ def simple_search(query, file_path):
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
-query = input(f"введите запрос для поиска: ")
-result_json = simple_search(query, "../data/operations.xlsx")
+# Пример запроса
+query1 = "транзакция 1"
+result_json = simple_search(query1, "../data/operations.xlsx")
 print(result_json)

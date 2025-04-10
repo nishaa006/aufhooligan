@@ -1,76 +1,70 @@
-import pytest
-import pandas as pd
-import tempfile
 import json
-import os
-from src.reports import expenses_by_category, load_operations_data
+import unittest
+
+import pandas as pd
+
+from src.reports import get_expenses_by_category
 
 
-@pytest.fixture
-def filled_excel_file():
-    data = {
-        "Категория": ["Еда", "Еда", "Транспорт", "Еда"],
-        "Дата платежа": ["01.01.2024", "15.02.2024", "01.03.2024", "25.03.2024"],
-        "Сумма операции": ["-500", "-300", "-200", "-100"]
-    }
-    df = pd.DataFrame(data)
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        df.to_excel(tmp.name, index=False)
-        yield tmp.name
-        os.remove(tmp.name)
+class TestGetExpensesByCategory(unittest.TestCase):
 
-@pytest.fixture
-def empty_excel_file():
-    df = pd.DataFrame()
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        df.to_excel(tmp.name, index=False)
-        yield tmp.name
-        os.remove(tmp.name)
+    def setUp(self):
+        """Настройка данных для тестов"""
+        data = {
+            "date": ["2025-01-15", "2025-02-20", "2025-03-10", "2025-03-25", "2025-04-05"],
+            "category": ["Food", "Food", "Transport", "Food", "Food"],
+            "amount": [100, 200, 50, 150, 100],
+        }
+        self.df = pd.DataFrame(data)
 
+    def test_expenses_by_category(self):
+        """Тест с обычными данными"""
+        start_date = "2025-01-01"
+        category = "Food"
+        result = get_expenses_by_category(self.df, category, start_date)
 
-def test_expenses_food(filled_excel_file):
-    result_json = expenses_by_category(
-        file_path=filled_excel_file,
-        category="Еда",
-        date_str="2024-03-31"
-    )
-    result = json.loads(result_json)
-    assert result["category"] == "Еда"
-    assert result["total_expenses"] == 900.0
-    assert result["period_start"] == "2024-01-01"
-    assert result["period_end"] == "2024-03-31"
+        expected_result = [{"category": "Food", "amount": 450}]
 
-def test_no_matching_category(filled_excel_file):
-    result_json = expenses_by_category(
-        file_path=filled_excel_file,
-        category="Книги",
-        date_str="2024-03-31"
-    )
-    result = json.loads(result_json)
-    assert result["total_expenses"] == 0.0
+        self.assertEqual(json.loads(result), expected_result)
 
-def test_invalid_date_input(filled_excel_file):
-    result_json = expenses_by_category(
-        file_path=filled_excel_file,
-        category="Еда",
-        date_str="не-дата"
-    )
-    result = json.loads(result_json)
-    assert "error" in result
+    def test_no_data_for_category(self):
+        """Тест, когда нет данных по категории"""
+        start_date = "2025-01-01"
+        category = "Transport"
+        result = get_expenses_by_category(self.df, category, start_date)
 
+        expected_result = [{"category": "Transport", "amount": 50}]
 
-def test_load_operations_success(filled_excel_file):
-    df = load_operations_data(filled_excel_file)
-    assert isinstance(df, pd.DataFrame)
-    assert not df.empty
-    assert set(df.columns) == {"Категория", "Дата платежа", "Сумма операции"}
+        self.assertEqual(json.loads(result), expected_result)
 
+    def test_no_data_for_date_range(self):
+        """Тест, когда нет данных по датам"""
+        start_date = "2024-01-01"
+        category = "Food"
+        result = get_expenses_by_category(self.df, category, start_date)
 
-def test_load_operations_empty_file(empty_excel_file):
-    with pytest.raises(ValueError, match="Файл пустой или не содержит данных"):
-        load_operations_data(empty_excel_file)
+        expected_result = {"error": "Нет данных для выбранной категории и периода."}
+
+        self.assertEqual(json.loads(result), expected_result)
+
+    def test_empty_dataframe(self):
+        """Тест с пустым DataFrame"""
+        empty_df = pd.DataFrame(columns=["date", "category", "amount"])
+        start_date = "2025-01-01"
+        category = "Food"
+        result = get_expenses_by_category(empty_df, category, start_date)
+
+        expected_result = {"error": "Нет данных для выбранной категории и периода."}
+
+        self.assertEqual(json.loads(result), expected_result)
+
+    def test_invalid_date_format(self):
+        """Тест с ошибкой в формате даты"""
+        start_date = "2025/01/01"
+        category = "Food"
+        result = get_expenses_by_category(self.df, category, start_date)
+        self.assertIn("time data", json.loads(result)["error"])
 
 
-def test_load_operations_file_not_found():
-    with pytest.raises(Exception):
-        load_operations_data("не_существующий_файл.xlsx")
+if __name__ == "__main__":
+    unittest.main()

@@ -1,67 +1,50 @@
 import json
 import logging
-import pandas as pd
-import datetime
+from datetime import datetime, timedelta
 
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-def load_operations_data(file_path):
-    """Загружает данные из Excel файла и возвращает их в формате DataFrame."""
+
+def get_expenses_by_category(df: pd.DataFrame, category: str, start_date: str) -> str:
+    """Функция для получения отчета о тратах по категории за трехмесячный период."""
     try:
-        logger.info(f"Загрузка данных из файла: {file_path}")
-        df = pd.read_excel(file_path)
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        end_date = start_date + timedelta(days=90)
+        df["date"] = pd.to_datetime(df["date"])
+        logging.info(
+            f"Данные отфильтрованы по категории: {category}, с {start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')}"
+        )
+        filtered_df = df[(df["category"] == category) & (df["date"] >= start_date) & (df["date"] <= end_date)]
 
-        if df.empty:
-            raise ValueError("Файл пустой или не содержит данных.")
+        if filtered_df.empty:
+            logging.warning("Нет данных для выбранной категории и периода.")
+            return json.dumps({"error": "Нет данных для выбранной категории и периода."}, ensure_ascii=False, indent=4)
+        category_expenses = filtered_df.groupby("category")["amount"].sum().reset_index()
+        logging.info(
+            f"Отчет по категории '{category}' за период с {start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')} успешно сформирован."
+        )
 
-        logger.info(f"Данные загружены успешно. Всего записей: {len(df)}")
-        return df
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке данных из файла: {e}")
-        raise
-
-def expenses_by_category(file_path, category, date_str):
-    """Функция для получения отчета «Траты по категории» за трехмесячный период из файла Excel."""
-    try:
-        date_ref = datetime.datetime.strptime(date_str, '%Y-%m-%d')
-        start_date = date_ref - datetime.timedelta(days=90)
-        end_date = date_ref
-
-        df = load_operations_data(file_path)
-
-        if 'Категория' not in df.columns or 'Дата платежа' not in df.columns or 'Сумма операции' not in df.columns:
-            raise ValueError("Файл не содержит нужных столбцов ('Категория', 'Дата платежа', 'Сумма операции').")
-
-        df['Дата платежа'] = pd.to_datetime(df['Дата платежа'], dayfirst=True, errors='coerce')
-        df['Сумма операции'] = df['Сумма операции'].replace(r'\s*RUB', '', regex=True)
-        df['Сумма операции'] = pd.to_numeric(df['Сумма операции'], errors='coerce')
-
-        filtered_df = df[(df['Категория'] == category) &
-                         (df['Дата платежа'] >= start_date) &
-                         (df['Дата платежа'] <= end_date)]
-
-        total_expenses = filtered_df['Сумма операции'].abs().sum()
-
-        result = {
-            "category": category,
-            "total_expenses": total_expenses,
-            "period_start": start_date.date().isoformat(),
-            "period_end": end_date.date().isoformat(),
-        }
-
-        logger.info(f"Общая сумма трат по категории '{category}' : {total_expenses}")
-        return json.dumps(result, ensure_ascii=False)
+        result = category_expenses.to_dict(orient="records")
+        return json.dumps(result, ensure_ascii=False, indent=4)
 
     except Exception as e:
-        logger.error(f"Ошибка при расчете отчета: {e}")
-        return json.dumps({"error": str(e)}, ensure_ascii=False)
+        logging.error(f"Ошибка при формировании отчета: {e}")
+        return json.dumps({"error": str(e)}, ensure_ascii=False, indent=4)
 
-file_path = "../data/operations.xlsx"
-category = input("Введите категорию: ").title()
-date_str = input("Введите дату в формате YYYY-MM-DD: ")
 
-result_json = expenses_by_category(file_path, category, date_str)
+if __name__ == "__main__":
+    data = {
+        "date": ["2025-01-15", "2025-02-20", "2025-03-10", "2025-03-25", "2025-04-05"],
+        "category": ["Food", "Food", "Transport", "Food", "Food"],
+        "amount": [100, 200, 50, 150, 100],
+    }
 
-print(result_json)
+    df = pd.DataFrame(data)
+
+    start_date = "2025-01-01"
+    category = "Food"
+    result = get_expenses_by_category(df, category, start_date)
+
+    print(result)

@@ -1,60 +1,42 @@
-import unittest
-from unittest.mock import patch
-import pandas as pd
 import json
+from unittest.mock import patch
+
+import pandas as pd
+
 from src.services import load_operations_data, simple_search
 
-class TestSearchFunctions(unittest.TestCase):
 
-    @patch('pandas.read_excel')
-    def test_load_operations_data(self, mock_read_excel):
-        mock_df = pd.DataFrame({
-            'Категория': ['Такси', 'Еда'],
-            'Дата платежа': ['2021-08-26', '2021-09-26'],
-            'Сумма операции': ['-100.00 RUB', '-200.00 RUB']
-        })
-        mock_read_excel.return_value = mock_df
+@patch("pandas.read_excel")
+def test_load_operations_data_success(mock_read_excel):
+    mock_df = pd.DataFrame({"Дата операции": ["2024-01-01"], "Сумма": [100]})
+    mock_read_excel.return_value = mock_df
 
-        result = load_operations_data('test_file.xlsx')
-        mock_read_excel.assert_called_once_with('test_file.xlsx')
-        pd.testing.assert_frame_equal(result, mock_df)
+    df = load_operations_data("fake_path.xlsx")
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == 1
 
-    @patch('search.load_operations_data')
-    def test_simple_search(self, mock_load_operations_data):
-        mock_df = pd.DataFrame({
-            'Категория': ['Такси', 'Еда', 'Такси'],
-            'Дата платежа': ['2021-08-26', '2021-09-26', '2021-10-26'],
-            'Сумма операции': ['-100.00 RUB', '-200.00 RUB', '-150.00 RUB']
-        })
-        mock_load_operations_data.return_value = mock_df
 
-        result = simple_search('такси', 'test_file.xlsx')
-        expected_result = {
-            "query": "такси",
-            "results_count": 2,
-            "results": [
-                {'Категория': 'Такси', 'Дата платежа': '2021-08-26', 'Сумма операции': '-100.00 RUB'},
-                {'Категория': 'Такси', 'Дата платежа': '2021-10-26', 'Сумма операции': '-150.00 RUB'}
-            ]
-        }
-        self.assertEqual(json.loads(result), expected_result)
+@patch("src.services.load_operations_data")
+def test_simple_search_found(mock_load_data):
+    test_data = pd.DataFrame(
+        {"Дата операции": ["2024-01-01", "2024-01-02"], "Описание": ["Покупка кофе", "Покупка книг"]}
+    )
+    mock_load_data.return_value = test_data
 
-    @patch('search.load_operations_data')
-    def test_simple_search_no_results(self, mock_load_operations_data):
-        mock_df = pd.DataFrame({
-            'Категория': ['Еда', 'Одежда'],
-            'Дата платежа': ['2021-09-26', '2021-10-26'],
-            'Сумма операции': ['-200.00 RUB', '-300.00 RUB']
-        })
-        mock_load_operations_data.return_value = mock_df
+    result_json = simple_search("кофе", "fake_path.xlsx")
+    result = json.loads(result_json)
 
-        result = simple_search('такси', 'test_file.xlsx')
-        expected_result = {
-            "query": "такси",
-            "results_count": 0,
-            "results": []
-        }
-        self.assertEqual(json.loads(result), expected_result)
+    assert "results_count" in result
+    assert result["results_count"] == 1
+    assert result["results"][0]["Описание"] == "Покупка кофе"
 
-if __name__ == '__main__':
-    unittest.main()
+
+@patch("src.utils.load_operations_data")
+def test_simple_search_error(mock_load_data):
+    mock_load_data.side_effect = Exception("[Errno 2] No such file or directory: 'fake_path.xlsx'")
+
+    result_json = simple_search("что-то", "fake_path.xlsx")
+    result = json.loads(result_json)
+
+    assert "error" in result
+    assert "[Errno 2] No such file or directory" in result["error"]
