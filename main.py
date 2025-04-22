@@ -1,28 +1,35 @@
+import logging
+import pandas as pd
 import json
-from datetime import datetime
+from src.views import main_page
+from src.reports import get_expenses_by_category
+from src.services import load_operations_data, simple_search
 
-from src.utils import analyze_data, fetch_data_from_api, load_operations_data, parse_datetime
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def home_page_function(datetime_str: str) -> str:
-    """Основная функция для страницы «Главная»"""
-    try:
-        dt = parse_datetime(datetime_str)
+raw_data = {
+        "date": ["2025-01-15", "2025-02-20", "2025-03-10", "2025-03-25", "2025-04-05"],
+        "category": ["Food", "Food", "Transport", "Food", "Food"],
+        "amount": [100, 200, 50, 150, 100],
+    }
 
-        api_data = fetch_data_from_api(dt)
-
-        processed_data = analyze_data(api_data, dt)
-
-        response = load_operations_data(datetime_str, api_data, processed_data)
-
-        return json.dumps(response, ensure_ascii=False, indent=2)
-
-    except Exception as e:
-        error_response = {"status": "error", "message": str(e), "timestamp": datetime.now().isoformat()}
-        return json.dumps(error_response, ensure_ascii=False, indent=2)
+date_str = "2025-04-10 15:30:00"
 
 
 if __name__ == "__main__":
-    test_datetime = "2025-04-09 14:30:00"
-    result = home_page_function(test_datetime)
+    response = main_page(date_str)
+    print(json.dumps(response, indent=4, ensure_ascii=False))
+
+    df = pd.DataFrame(raw_data)
+
+    start_date = "2025-01-01"
+    category = "Food"
+    result = get_expenses_by_category(df, category, start_date)
+
     print(result)
+
+    query1 = "транзакция 1"
+    result_json = simple_search(query1, "../data/operations.xlsx")
+    print(result_json)

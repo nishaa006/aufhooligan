@@ -1,11 +1,7 @@
 import json
-import logging
-import pandas as pd
 
 from src.utils import parse_datetime, fetch_data_from_api, analyze_data
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def main_page(date_str: str):
@@ -22,11 +18,11 @@ def main_page(date_str: str):
 
         # Формируем JSON-ответ
         json_response = json.dumps(analysis_result)
-        logger.info("Результат успешно сформирован и возвращен")
+
         return json_response
 
     except Exception as e:
-        logger.error(f"Ошибка на странице 'Главная': {e}")
+
         error_response = json.dumps({"error": "Внутренняя ошибка сервера"})
         return error_response
 
@@ -35,4 +31,4 @@ def main_page(date_str: str):
 if __name__ == "__main__":
     date_input = "2025-04-10 15:30:00"  # Пример даты и времени
     response = main_page(date_input)
-    print(response)
+    print(json.dumps(response, indent=4, ensure_ascii=False))
